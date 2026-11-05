@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小3漢字 テストゲーム</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 標準漢字フォントの明確な指定 */
+        .kanji-font {
+            font-family: "Hiragino Kaku Gothic ProN", "ヒラギノ角ゴ ProN W3", "Yu Gothic", "游ゴシック", "Meiryo", sans-serif;
+        }
+
+        /* ボタン押し込みエフェクト */
+        .btn-push {
+            transition: all 0.1s ease;
+            box-shadow: 0 6px 0 0 rgba(0, 0, 0, 0.18);
+        }
+        .btn-push:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.18);
+        }
+
+        /* ポップアップアニメーション */
+        @keyframes pop-in {
+            0% { transform: scale(0.6); opacity: 0; }
+            70% { transform: scale(1.08); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: pop-in 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* はなまる描画 */
+        @keyframes draw-flower {
+            0% { stroke-dashoffset: 1000; }
+            100% { stroke-dashoffset: 0; }
+        }
+        .hanamaru-path {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw-flower 0.7s ease-out forwards;
+        }
+
+        /* 紙吹雪用キャンバス */
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="bg-sky-50 text-slate-800 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- ヘッダー -->
+    <header class="bg-sky-400 border-b-4 border-sky-500 p-3 shadow-md flex justify-between items-center px-4 md:px-8">
+        <div class="flex items-center space-x-2">
+            <span class="text-2xl md:text-3xl">✏️</span>
+            <h1 class="text-xl md:text-2xl font-black text-sky-950 tracking-wider">小3 かん字テスト</h1>
+        </div>
+        <button id="sound-toggle-btn" class="bg-white/90 hover:bg-white text-sky-900 font-bold px-3 py-1.5 rounded-xl border-2 border-sky-300 text-sm flex items-center gap-1 transition shadow-sm">
+            <span id="sound-icon">🔊</span>
+            <span id="sound-status-text" class="hidden sm:inline">おと ON</span>
+        </button>
+    </header>
+
+    <!-- メイン領域 -->
+    <main class="flex-1 flex flex-col items-center justify-center p-3 md:p-6 max-w-3xl w-full mx-auto">
+
+        <!-- ================= 1. コース選択（スタート画面） ================= -->
+        <div id="start-screen" class="w-full text-center flex flex-col items-center justify-center space-y-5 py-4 animate-pop">
+            
+            <div class="bg-white p-5 rounded-3xl border-4 border-sky-300 shadow-md w-full max-w-md">
+                <div class="text-4xl mb-2">📖</div>
+                <h2 class="text-2xl md:text-3xl font-black text-slate-800">れい文をよんで<br>正しいかん字をえらぼう！</h2>
+                <p class="text-xs md:text-sm text-slate-500 font-bold mt-2">小学校3年生の漢字テストの学習用ゲームです。</p>
+            </div>
+
+            <!-- コース選びボタン -->
+            <div class="w-full max-w-md space-y-3 px-2">
+                <button data-mode="easy" class="course-btn btn-push w-full bg-emerald-500 hover:bg-emerald-400 text-white p-4 rounded-2xl border-b-4 border-emerald-700 shadow-md transition text-left flex items-center justify-between">
+                    <div>
+                        <div class="text-xl font-black flex items-center gap-2">🌱 初級コース（2たく）</div>
+                        <div class="text-xs text-emerald-100 font-bold">全5問・2つの漢字から選ぶよ</div>
+                    </div>
+                    <span class="text-2xl">➔</span>
+                </button>
+
+                <button data-mode="normal" class="course-btn btn-push w-full bg-amber-500 hover:bg-amber-400 text-white p-4 rounded-2xl border-b-4 border-amber-700 shadow-md transition text-left flex items-center justify-between">
+                    <div>
+                        <div class="text-xl font-black flex items-center gap-2">⭐ 中級コース（5たく）</div>
+                        <div class="text-xs text-amber-100 font-bold">全10問・5つの漢字から選ぶよ</div>
+                    </div>
+                    <span class="text-2xl">➔</span>
+                </button>
+
+                <button data-mode="endless" class="course-btn btn-push w-full bg-rose-500 hover:bg-rose-400 text-white p-4 rounded-2xl border-b-4 border-rose-700 shadow-md transition text-left flex items-center justify-between">
+                    <div>
+                        <div class="text-xl font-black flex items-center gap-2">🔥 エンドレス（サバイバル）</div>
+                        <div class="text-xs text-rose-100 font-bold">1問10秒制限！間違えたら即ゲームオーバー</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-2xl">⏱️</span>
+                        <div id="high-score-display" class="text-[10px] font-black bg-rose-700 px-2 py-0.5 rounded-full mt-0.5">ハイスコア: 0</div>
+                    </div>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- ================= 2. クイズプレイ画面 ================= -->
+        <div id="game-screen" class="hidden w-full flex flex-col items-center space-y-4 md:space-y-6">
+
+            <!-- ステータスバー -->
+            <div class="w-full bg-white px-4 py-2 rounded-2xl border-2 border-sky-200 shadow-sm flex flex-col gap-1.5">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center space-x-2">
+                        <span id="course-badge" class="text-xs bg-sky-200 text-sky-900 font-black px-2.5 py-0.5 rounded-md">中級</span>
+                        <span id="question-counter-label" class="text-xs md:text-sm font-bold text-sky-800">だい</span>
+                        <span id="current-question-num" class="text-xl font-black text-sky-600">1</span>
+                        <span id="total-questions-num" class="text-xs md:text-sm font-bold text-sky-800">/ 10 問</span>
+                    </div>
+
+                    <!-- スコア / 連続正解 -->
+                    <div class="flex items-center space-x-1">
+                        <span id="score-label" class="text-xs font-bold text-slate-500">てんすう:</span>
+                        <span id="score-text" class="text-xl font-black text-rose-500">0</span>
+                    </div>
+                </div>
+
+                <!-- プログレスバー -->
+                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200">
+                    <div id="progress-bar" class="bg-sky-500 h-full transition-all duration-300" style="width: 10%;"></div>
+                </div>
+
+                <!-- タイムアタック用タイマーバー（エンドレスのみ） -->
+                <div id="timer-container" class="hidden w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-300">
+                    <div id="timer-bar" class="bg-rose-500 h-full w-full transition-all duration-100"></div>
+                </div>
+            </div>
+
+            <!-- 問題カード -->
+            <div class="w-full bg-white rounded-3xl border-4 border-sky-300 p-6 md:p-8 text-center shadow-md relative min-h-[140px] flex flex-col items-center justify-center">
+                <div class="absolute top-2.5 left-4 bg-sky-400 text-sky-950 text-xs font-black px-3 py-0.5 rounded-full">
+                    れい文をよもう！
+                </div>
+
+                <!-- 例：「【やく】しゃになる」 -->
+                <div id="sentence-display" class="text-2xl md:text-4xl font-black text-slate-800 tracking-wide mt-2">
+                    <!-- JSで挿入 -->
+                </div>
+            </div>
+
+            <!-- 選択肢ボタン群 -->
+            <div class="w-full">
+                <div class="text-xs font-bold text-sky-900 text-center mb-2">
+                    👇 あてはまる かん字をタップ！
+                </div>
+                
+                <!-- ボタン配置（2択 or 5択） -->
+                <div id="choices-container" class="w-full gap-3 md:gap-4">
+                    <!-- JSで動的にボタン生成 -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================= 3. 結果判定ポータル（モーダル） ================= -->
+        <div id="result-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-3xl border-4 border-sky-400 p-6 max-w-md w-full text-center shadow-2xl animate-pop relative">
+                
+                <div id="modal-badge" class="inline-block px-4 py-1 rounded-full text-lg font-black text-white mb-2">
+                    せいかい！
+                </div>
+
+                <!-- まる・ばつアニメーション -->
+                <div class="relative w-28 h-28 mx-auto flex items-center justify-center my-1">
+                    <svg id="hanamaru-svg" class="w-full h-full text-rose-500 hidden" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+                        <path class="hanamaru-path" d="M 50,15 A 35,35 0 1 0 85,50 A 35,35 0 1 0 50,15 Z" />
+                        <path class="hanamaru-path" d="M 50,23 A 27,27 0 1 0 77,50 A 27,27 0 1 0 50,23 Z" />
+                    </svg>
+
+                    <div id="wrong-mark" class="text-7xl text-blue-500 font-black hidden">
+                        💧
+                    </div>
+
+                    <div id="modal-kanji-big" class="absolute text-5xl font-black text-slate-800 bg-amber-100 rounded-2xl w-20 h-20 flex items-center justify-center border-2 border-amber-400 shadow kanji-font">
+                        役
+                    </div>
+                </div>
+
+                <div class="space-y-1.5 my-3">
+                    <div id="modal-full-sentence" class="text-xl font-black text-slate-800">
+                        「役者になる」
+                    </div>
+                    <div id="modal-explanation" class="text-sm font-bold text-slate-500">
+                        せいかい: <span id="correct-kanji-text" class="text-rose-600 font-black text-lg kanji-font">役</span>
+                    </div>
+                </div>
+
+                <button id="next-question-btn" class="btn-push w-full bg-sky-500 hover:bg-sky-400 text-white text-xl font-black py-3 rounded-2xl border-b-4 border-sky-700 shadow-md transition">
+                    つぎへ すすむ ➔
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= 4. テスト終了・スコア画面 ================= -->
+        <div id="score-screen" class="hidden w-full text-center flex flex-col items-center justify-center space-y-4 py-3 animate-pop">
+            
+            <div id="score-header-badge" class="bg-sky-400 text-sky-950 font-black text-xl px-6 py-1.5 rounded-full shadow-sm">
+                テストしゅうりょう！
+            </div>
+
+            <!-- スコアカード -->
+            <div class="bg-white rounded-3xl border-4 border-sky-300 p-5 max-w-md w-full shadow-xl relative">
+                <div class="text-slate-500 font-bold text-sm mb-1" id="score-title-label">あなたのてんすう</div>
+                <div class="flex items-baseline justify-center gap-1">
+                    <span id="final-score-num" class="text-6xl md:text-7xl font-black text-rose-500">100</span>
+                    <span id="score-unit-label" class="text-2xl font-bold text-slate-600">点</span>
+                </div>
+                <div id="correct-count-text" class="text-sm font-bold text-slate-600 mt-1">
+                    10問中 10問 せいかい！
+                </div>
+
+                <div class="my-3 border-t-2 border-dashed border-sky-200"></div>
+
+                <div id="rank-title" class="text-2xl font-black text-sky-800 mb-1">
+                    💮 たいへんよくできました！
+                </div>
+                <p id="rank-message" class="text-sm font-bold text-slate-600">
+                    素晴らしい！かん字バッチリだね！
+                </p>
+            </div>
+
+            <!-- 間違えた問題リスト ＆ 強制自動復習通知 -->
+            <div id="wrong-section" class="w-full max-w-md hidden space-y-2">
+                <div class="bg-rose-50 border-2 border-rose-300 rounded-2xl p-3 text-left shadow-sm">
+                    <div class="font-black text-rose-600 text-sm mb-1">
+                        <span>❌ まちがえた もんだい</span>
+                    </div>
+                    <div id="wrong-list-container" class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                        <!-- JS挿入 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ボタン類 -->
+            <div class="flex flex-col sm:flex-row gap-3 w-full max-w-md justify-center pt-1">
+                <button id="manual-review-btn" class="hidden btn-push w-full bg-rose-500 hover:bg-rose-400 text-white text-xl font-black py-3.5 px-4 rounded-2xl border-b-4 border-rose-700 shadow-md transition flex items-center justify-center gap-2">
+                    <span>ふくしゅうに すすむ</span>
+                    <span>✏️</span>
+                </button>
+
+                <button id="restart-btn" class="btn-push flex-1 bg-emerald-500 hover:bg-emerald-400 text-white text-lg font-black py-3 px-4 rounded-2xl border-b-4 border-emerald-700 shadow-md transition flex items-center justify-center gap-2">
+                    <span>コース選択にもどる</span>
+                    <span>🏠</span>
+                </button>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="text-center py-2 text-xs text-sky-800 font-bold opacity-75">
+        小学校3年生 漢字テスト対応ゲーム
+    </footer>
+
+    <!-- スクリプト -->
+    <script>
+        /* =========================================================
+         * 1. 3年生 漢字テスト問題データベース
+         * ========================================================= */
+        const KANJI_DATABASE = [
+            // ドリル画像1対応
+            { id: 1, kanji: "役", reading: "やく", sentence: "【やく】しゃになる", fullSentence: "役者になる", distractors: ["投", "段", "段", "殺"] },
+            { id: 2, kanji: "役", reading: "やく", sentence: "【やく】わりをきめる", fullSentence: "役割を決める", distractors: ["投", "使", "作", "服"] },
+            { id: 3, kanji: "想", reading: "そう", sentence: "かん【そう】をかく", fullSentence: "感想を書く", distractors: ["相", "箱", "考", "心"] },
+            { id: 4, kanji: "想", reading: "おも", sentence: "【おも】いでをはなす", fullSentence: "思い出を話す", hint: "おもいで", distractors: ["思", "相", "考", "念"] },
+            { id: 5, kanji: "返", reading: "かえ", sentence: "ほんを【かえ】す", fullSentence: "本を返す", distractors: ["反", "坂", "送", "近"] },
+            { id: 6, kanji: "返", reading: "へん", sentence: "【へん】じをする", fullSentence: "返事をする", distractors: ["反", "片", "変", "辺"] },
+            { id: 7, kanji: "根", reading: "ね", sentence: "きの【ね】っこ", fullSentence: "木の根っこ", distractors: ["限", "銀", "眼", "木"] },
+            { id: 8, kanji: "守", reading: "まも", sentence: "やくそくを【まも】る", fullSentence: "約束を守る", distractors: ["狩", "寺", "官", "付"] },
+            { id: 9, kanji: "屋", reading: "や", sentence: "ほん【や】さんにいく", fullSentence: "本屋さんに行く", distractors: ["室", "屋", "家", "店"] },
+            { id: 10, kanji: "列", reading: "れつ", sentence: "いち【れつ】にならぶ", fullSentence: "一列にならぶ", distractors: ["例", "烈", "利", "別"] },
+            { id: 11, kanji: "寒", reading: "さむ", sentence: "【さむ】いふゆのあさ", fullSentence: "寒い冬の朝", distractors: ["塞", "賽", "賽", "春"] },
+            { id: 12, kanji: "血", reading: "ち", sentence: "はな【ち】がでる", fullSentence: "鼻血がでる", distractors: ["皿", "他", "首", "赤"] },
+            { id: 13, kanji: "荷", reading: "に", sentence: "おもい【に】もつ", fullSentence: "重い荷物", distractors: ["何", "河", "苛", "物"] },
+            { id: 14, kanji: "主", reading: "おも", sentence: "【おも】な仕事", fullSentence: "主な仕事", distractors: ["王", "玉", "住", "柱"] },
+            { id: 15, kanji: "軽", reading: "かる", sentence: "【かる】いにもつ", fullSentence: "軽い荷物", distractors: ["経", "茎", "怪", "重"] },
+            { id: 16, kanji: "暗", reading: "くら", sentence: "【くら】いへや", fullSentence: "暗い部屋", distractors: ["音", "日", "明", "案"] },
+            { id: 17, kanji: "写", reading: "しゃ", sentence: "【しゃ】しんをとる", fullSentence: "写真をとる", distractors: ["与", "与", "考", "画"] },
+            { id: 18, kanji: "州", reading: "しゅう", sentence: "きゅう【しゅう】ちほう", fullSentence: "九州地方", distractors: ["川", "洲", "洲", "県"] },
+            { id: 19, kanji: "命", reading: "いのち", sentence: "【いのち】をたいせつにする", fullSentence: "命を大切にする", hint: "いのち", distractors: ["傘", "令", "合", "名"] },
+            { id: 20, kanji: "橋", reading: "はし", sentence: "おおきな【はし】をわたる", fullSentence: "大きな橋をわたる", distractors: ["橘", "喬", "板", "校"] },
+            { id: 21, kanji: "真", reading: "ま", sentence: "【ま】ん中のせき", fullSentence: "真ん中の席", distractors: ["直", "具", "具", "正"] },
+            { id: 22, kanji: "第", reading: "だい", sentence: "【だい】いちもん", fullSentence: "第一問", distractors: ["弟", "梯", "等", "竹"] },
+            { id: 23, kanji: "暑", reading: "あつ", sentence: "【あつ】いなつのひ", fullSentence: "暑い夏の日", distractors: ["者", "署", "暖", "熱"] },
+
+            // ドリル画像2対応
+            { id: 24, kanji: "板", reading: "ばん", sentence: "かん【ばん】をたてる", fullSentence: "看板を立てる", distractors: ["反", "坂", "阪", "木"] },
+            { id: 25, kanji: "板", reading: "いた", sentence: "きの【いた】をつかう", fullSentence: "木の板をつかう", distractors: ["反", "坂", "版", "片"] },
+            { id: 26, kanji: "負", reading: "ぶ", sentence: "しょう【ぶ】をきめる", fullSentence: "勝負を決める", distractors: ["貝", "包", "不", "勝"] },
+            { id: 27, kanji: "負", reading: "ま", sentence: "しあいに【ま】ける", fullSentence: "試合に負ける", distractors: ["貝", "勝", "失", "敗"] },
+            { id: 28, kanji: "笛", reading: "ぶえ", sentence: "くち【ぶえ】をふく", fullSentence: "口笛をふく", distractors: ["由", "笛", "笛", "竹"] },
+            { id: 29, kanji: "注", reading: "ちゅう", sentence: "【ちゅう】いする", fullSentence: "注意する", distractors: ["主", "住", "柱", "宙"] },
+            { id: 30, kanji: "放", reading: "ほう", sentence: "【ほう】かごにあそぶ", fullSentence: "放課後あそぶ", distractors: ["方", "房", "訪", "教"] },
+            { id: 31, kanji: "祭", reading: "まつ", sentence: "なつ【まつ】りをたのしむ", fullSentence: "夏祭りを楽しむ", distractors: ["察", "際", "示", "祭"] },
+            { id: 32, kanji: "柱", reading: "ちゅう", sentence: "でん【ちゅう】がみえる", fullSentence: "電柱が見える", distractors: ["主", "住", "注", "木"] },
+            { id: 33, kanji: "悪", reading: "わる", sentence: "【わる】いこころをはらう", fullSentence: "悪い心をはらう", distractors: ["亜", "心", "安", "愛"] },
+            { id: 34, kanji: "油", reading: "あぶら", sentence: "サラダ【あぶら】", fullSentence: "サラダ油", distractors: ["由", "柚", "抽", "水"] },
+            { id: 35, kanji: "者", reading: "しゃ", sentence: "い【しゃ】さん", fullSentence: "医者さん", distractors: ["日", "暑", "署", "煮"] },
+            { id: 36, kanji: "港", reading: "みなと", sentence: "【みなと】にふねがつく", fullSentence: "港に船がつく", distractors: ["巷", "降", "洪", "海"] },
+            { id: 37, kanji: "庫", reading: "こ", sentence: "しゃ【こ】にいれる", fullSentence: "車庫に入れる", distractors: ["車", "広", "庫", "車"] },
+            { id: 38, kanji: "薬", reading: "くすり", sentence: "【くすり】をのむ", fullSentence: "薬をのむ", distractors: ["楽", "草", "葉", "箱"] },
+            { id: 39, kanji: "波", reading: "なみ", sentence: "たかい【なみ】", fullSentence: "たかい波", distractors: ["皮", "破", "婆", "海"] },
+            { id: 40, kanji: "両", reading: "りょう", sentence: "【りょう】てをあげる", fullSentence: "両手であげる", hint: "りょうて", distractors: ["雨", "満", "再", "西"] },
+            { id: 41, kanji: "員", reading: "いん", sentence: "ぜん【いん】しゅうごう", fullSentence: "全員しゅうごう", distractors: ["円", "貝", "員", "口"] },
+            { id: 42, kanji: "勉", reading: "べん", sentence: "【べん】きょうする", fullSentence: "勉強する", distractors: ["免", "力", "勉", "勉"] },
+            { id: 43, kanji: "業", reading: "ぎょう", sentence: "じゅ【ぎょう】をうける", fullSentence: "授業をうける", distractors: ["美", "羊", "業", "木"] },
+            { id: 44, kanji: "係", reading: "かかり", sentence: "クラスの【かかり】", fullSentence: "クラスの係", distractors: ["係", "系", "保", "孫"] },
+            { id: 45, kanji: "勝", reading: "かつ", sentence: "しあいに【かつ】", fullSentence: "試合に勝つ", distractors: ["券", "負", "騰", "力"] }
+        ];
+
+        /* =========================================================
+         * 2. Web Audio API 音響マネージャー
+         * ========================================================= */
+        class SoundManager {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) this.ctx = new AudioContext();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTap() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.06);
+
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.06);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.06);
+            }
+
+            playCorrect() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    const startTime = this.ctx.currentTime + idx * 0.07;
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, startTime);
+
+                    gain.gain.setValueAtTime(0.2, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.25);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.25);
+                });
+            }
+
+            playWrong() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(130, this.ctx.currentTime + 0.15);
+
+                gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.3);
+            }
+
+            playTimeUp() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(260, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(130, this.ctx.currentTime + 0.2);
+
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.4);
+            }
+
+            playFanfare() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const melody = [
+                    { f: 523.25, d: 0.12 },
+                    { f: 659.25, d: 0.12 },
+                    { f: 783.99, d: 0.12 },
+                    { f: 1046.50, d: 0.35 }
+                ];
+                let now = this.ctx.currentTime;
+                melody.forEach(note => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(note.f, now);
+
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + note.d + 0.1);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + note.d + 0.1);
+
+                    now += note.d;
+                });
+            }
+        }
+
+        const sound = new SoundManager();
+
+        /* =========================================================
+         * 3. ゲーム状態（State）
+         * ========================================================= */
+        let gameMode = 'normal'; // 'easy' (2択 5問), 'normal' (5択 10問), 'endless' (5択 時間制限 1ミス終了)
+        let currentQuestions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let streakCount = 0;
+        let isReviewMode = false;
+        let wrongQuestions = [];
+
+        // ハイスコア保存用
+        let highScore = parseInt(localStorage.getItem('kanji_quiz_highscore') || '0', 10);
+
+        // タイマー
+        let timerIntervalId = null;
+        const ENDLESS_TIME_LIMIT = 10; // 10秒
+
+        /* DOM要素 */
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const scoreScreen = document.getElementById('score-screen');
+        const resultModal = document.getElementById('result-modal');
+
+        const courseBtns = document.querySelectorAll('.course-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const manualReviewBtn = document.getElementById('manual-review-btn');
+        const nextQuestionBtn = document.getElementById('next-question-btn');
+        const soundToggleBtn = document.getElementById('sound-toggle-btn');
+
+        const highScoreDisplay = document.getElementById('high-score-display');
+        const courseBadgeEl = document.getElementById('course-badge');
+        const questionCounterLabel = document.getElementById('question-counter-label');
+        const currentQuestionNumEl = document.getElementById('current-question-num');
+        const totalQuestionsNumEl = document.getElementById('total-questions-num');
+        const scoreLabelEl = document.getElementById('score-label');
+        const scoreTextEl = document.getElementById('score-text');
+        const progressBarEl = document.getElementById('progress-bar');
+        const timerContainerEl = document.getElementById('timer-container');
+        const timerBarEl = document.getElementById('timer-bar');
+        const sentenceDisplayEl = document.getElementById('sentence-display');
+        const choicesContainerEl = document.getElementById('choices-container');
+
+        // ハイスコア初期表示
+        highScoreDisplay.textContent = `ハイスコア: ${highScore}`;
+
+        /* =========================================================
+         * 4. イベント・ゲーム進行ロジック
+         * ========================================================= */
+
+        // 音切替
+        soundToggleBtn.addEventListener('click', () => {
+            sound.enabled = !sound.enabled;
+            const soundIcon = document.getElementById('sound-icon');
+            const soundStatus = document.getElementById('sound-status-text');
+            if (sound.enabled) {
+                soundIcon.textContent = '🔊';
+                soundStatus.textContent = 'おと ON';
+                sound.playTap();
+            } else {
+                soundIcon.textContent = '🔇';
+                soundStatus.textContent = 'おと OFF';
+            }
+        });
+
+        // コース選択
+        courseBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                sound.playTap();
+                gameMode = btn.dataset.mode;
+                startGame(false);
+            });
+        });
+
+        // コース選択へ戻る
+        restartBtn.addEventListener('click', () => {
+            stopTimer();
+            sound.playTap();
+            showStartScreen();
+        });
+
+        // 手動復習ボタン
+        manualReviewBtn.addEventListener('click', () => {
+            sound.playTap();
+            startReviewGame();
+        });
+
+        // 次の問題ボタン
+        nextQuestionBtn.addEventListener('click', () => {
+            sound.playTap();
+            resultModal.classList.add('hidden');
+
+            if (gameMode === 'endless' && !isReviewMode) {
+                // エンドレスモードで失敗した場合はモーダル後にリザルトへ
+                if (wrongQuestions.length > 0) {
+                    showScoreScreen();
+                    return;
+                }
+            }
+
+            currentQuestionIndex++;
+            if (currentQuestionIndex < currentQuestions.length) {
+                loadQuestion();
+            } else {
+                showScoreScreen();
+            }
+        });
+
+        function shuffle(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function showStartScreen() {
+            startScreen.classList.remove('hidden');
+            scoreScreen.classList.add('hidden');
+            resultModal.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+            highScoreDisplay.textContent = `ハイスコア: ${highScore}`;
+        }
+
+        // ゲーム初期化
+        function startGame(isReview = false) {
+            startScreen.classList.add('hidden');
+            scoreScreen.classList.add('hidden');
+            resultModal.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+
+            isReviewMode = isReview;
+
+            if (!isReviewMode) {
+                wrongQuestions = [];
+                score = 0;
+                streakCount = 0;
+
+                if (gameMode === 'easy') {
+                    currentQuestions = shuffle(KANJI_DATABASE).slice(0, 5);
+                } else if (gameMode === 'normal') {
+                    currentQuestions = shuffle(KANJI_DATABASE).slice(0, 10);
+                } else if (gameMode === 'endless') {
+                    // エンドレスは全問題ランダムループ
+                    currentQuestions = shuffle(KANJI_DATABASE);
+                }
+            }
+
+            // バッジ・カウンター設定
+            if (isReviewMode) {
+                courseBadgeEl.textContent = 'ふくしゅう';
+                courseBadgeEl.className = 'text-xs bg-rose-200 text-rose-900 font-black px-2.5 py-0.5 rounded-md';
+                scoreLabelEl.textContent = 'てんすう:';
+            } else if (gameMode === 'easy') {
+                courseBadgeEl.textContent = '初級（2択）';
+                courseBadgeEl.className = 'text-xs bg-emerald-200 text-emerald-900 font-black px-2.5 py-0.5 rounded-md';
+                scoreLabelEl.textContent = 'てんすう:';
+            } else if (gameMode === 'normal') {
+                courseBadgeEl.textContent = '中級（5択）';
+                courseBadgeEl.className = 'text-xs bg-amber-200 text-amber-900 font-black px-2.5 py-0.5 rounded-md';
+                scoreLabelEl.textContent = 'てんすう:';
+            } else {
+                courseBadgeEl.textContent = 'エンドレス 🔥';
+                courseBadgeEl.className = 'text-xs bg-rose-200 text-rose-900 font-black px-2.5 py-0.5 rounded-md';
+                scoreLabelEl.textContent = 'れんぞく:';
+            }
+
+            currentQuestionIndex = 0;
+            scoreTextEl.textContent = gameMode === 'endless' ? streakCount : score;
+
+            loadQuestion();
+        }
+
+        // 復習モード開始
+        function startReviewGame() {
+            currentQuestions = [...wrongQuestions];
+            wrongQuestions = [];
+            startGame(true);
+        }
+
+        // 問題の読み込み
+        function loadQuestion() {
+            stopTimer();
+
+            // エンドレスで配列が終わったら再度シャッフル追加
+            if (gameMode === 'endless' && currentQuestionIndex >= currentQuestions.length && !isReviewMode) {
+                currentQuestions = currentQuestions.concat(shuffle(KANJI_DATABASE));
+            }
+
+            const q = currentQuestions[currentQuestionIndex];
+
+            // プログレスバー・問題数表示
+            const totalQ = currentQuestions.length;
+            currentQuestionNumEl.textContent = currentQuestionIndex + 1;
+
+            if (gameMode === 'endless' && !isReviewMode) {
+                totalQuestionsNumEl.textContent = `問目`;
+                progressBarEl.style.width = '100%';
+            } else {
+                totalQuestionsNumEl.textContent = `/ ${totalQ} 問`;
+                progressBarEl.style.width = `${((currentQuestionIndex + 1) / totalQ) * 100}%`;
+            }
+
+            // 問題文（例文）フォーマット表示
+            const formattedSentence = q.sentence.replace(
+                /【(.*?)】/g,
+                '<span class="text-rose-600 bg-amber-200 px-3 py-1 rounded-2xl border-b-4 border-rose-400 font-black inline-block mx-1 shadow-sm transform -rotate-1">$1</span>'
+            );
+            sentenceDisplayEl.innerHTML = formattedSentence;
+
+            // 選択肢作成
+            let optionCount = (gameMode === 'easy' && !isReviewMode) ? 2 : 5;
+            
+            // 正解漢字 + ダミー漢字
+            let choiceKanjiList = [q.kanji];
+            let rawDistractorPool = [...q.distractors];
+
+            // データベース内の他漢字からもダミーを補充
+            KANJI_DATABASE.forEach(item => {
+                if (item.kanji !== q.kanji && !rawDistractorPool.includes(item.kanji)) {
+                    rawDistractorPool.push(item.kanji);
+                }
+            });
+
+            const selectedDistractors = shuffle(Array.from(new Set(rawDistractorPool))).slice(0, optionCount - 1);
+            choiceKanjiList = shuffle([...choiceKanjiList, ...selectedDistractors]);
+
+            // ボタン生成
+            choicesContainerEl.innerHTML = '';
+            
+            if (optionCount === 2) {
+                choicesContainerEl.className = "grid grid-cols-2 gap-4 max-w-md mx-auto";
+            } else {
+                choicesContainerEl.className = "grid grid-cols-2 sm:grid-cols-5 gap-3 max-w-2xl mx-auto";
+            }
+
+            choiceKanjiList.forEach(kanjiChar => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn btn-push bg-white hover:bg-amber-100 text-slate-800 font-black text-4xl md:text-5xl h-20 md:h-24 rounded-3xl border-3 border-amber-300 border-b-6 border-b-amber-400 shadow-md flex items-center justify-center transition transform active:scale-95 kanji-font';
+                btn.textContent = kanjiChar;
+
+                btn.addEventListener('click', () => {
+                    stopTimer();
+                    checkAnswer(kanjiChar, q);
+                });
+
+                choicesContainerEl.appendChild(btn);
+            });
+
+            // エンドレスモード（タイマー開始）
+            if (gameMode === 'endless' && !isReviewMode) {
+                timerContainerEl.classList.remove('hidden');
+                startTimer();
+            } else {
+                timerContainerEl.classList.add('hidden');
+            }
+        }
+
+        // タイマー処理
+        function startTimer() {
+            let timeRemaining = ENDLESS_TIME_LIMIT;
+            timerBarEl.style.width = '100%';
+            
+            const stepMs = 100;
+            const totalSteps = (ENDLESS_TIME_LIMIT * 1000) / stepMs;
+            let currentStep = 0;
+
+            timerIntervalId = setInterval(() => {
+                currentStep++;
+                const percentage = Math.max(0, 100 - (currentStep / totalSteps) * 100);
+                timerBarEl.style.width = `${percentage}%`;
+
+                if (percentage <= 0) {
+                    stopTimer();
+                    sound.playTimeUp();
+                    const q = currentQuestions[currentQuestionIndex];
+                    checkAnswer(null, q, true); // 時間切れ
+                }
+            }, stepMs);
+        }
+
+        function stopTimer() {
+            if (timerIntervalId) {
+                clearInterval(timerIntervalId);
+                timerIntervalId = null;
+            }
+        }
+
+        // 回答判定
+        function checkAnswer(selectedKanji, q, isTimeOut = false) {
+            const isCorrect = !isTimeOut && selectedKanji === q.kanji;
+
+            if (isCorrect) {
+                sound.playCorrect();
+                if (!isReviewMode) {
+                    score += 10;
+                    streakCount++;
+                    if (gameMode === 'endless' && streakCount > highScore) {
+                        highScore = streakCount;
+                        localStorage.setItem('kanji_quiz_highscore', highScore.toString());
+                    }
+                }
+                scoreTextEl.textContent = gameMode === 'endless' ? streakCount : score;
+            } else {
+                sound.playWrong();
+                if (!wrongQuestions.some(item => item.id === q.id)) {
+                    wrongQuestions.push(q);
+                }
+            }
+
+            showResultModal(isCorrect, isTimeOut, q);
+        }
+
+        // 結果モーダル（まる・ばつ）
+        function showResultModal(isCorrect, isTimeOut, q) {
+            const modalBadge = document.getElementById('modal-badge');
+            const hanamaruSvg = document.getElementById('hanamaru-svg');
+            const wrongMark = document.getElementById('wrong-mark');
+            const modalKanjiBig = document.getElementById('modal-kanji-big');
+            const modalFullSentence = document.getElementById('modal-full-sentence');
+            const correctKanjiText = document.getElementById('correct-kanji-text');
+
+            modalKanjiBig.textContent = q.kanji;
+            modalFullSentence.textContent = `「${q.fullSentence}」`;
+            correctKanjiText.textContent = q.kanji;
+
+            if (isCorrect) {
+                modalBadge.className = "inline-block px-6 py-1 rounded-full text-lg font-black text-white mb-2 bg-emerald-500 shadow";
+                modalBadge.textContent = "🌸 せいかい！ 🌸";
+
+                hanamaruSvg.classList.remove('hidden');
+                wrongMark.classList.add('hidden');
+                hanamaruSvg.innerHTML = hanamaruSvg.innerHTML;
+            } else {
+                modalBadge.className = "inline-block px-6 py-1 rounded-full text-lg font-black text-white mb-2 bg-rose-500 shadow";
+                modalBadge.textContent = isTimeOut ? "⏰ じかんぎれ！" : "ざんねん！";
+
+                hanamaruSvg.classList.add('hidden');
+                wrongMark.classList.remove('hidden');
+            }
+
+            resultModal.classList.remove('hidden');
+        }
+
+        // 成績結果画面
+        function showScoreScreen() {
+            gameScreen.classList.add('hidden');
+            scoreScreen.classList.remove('hidden');
+
+            const scoreHeaderBadge = document.getElementById('score-header-badge');
+            const finalScoreNum = document.getElementById('final-score-num');
+            const scoreTitleLabel = document.getElementById('score-title-label');
+            const scoreUnitLabel = document.getElementById('score-unit-label');
+            const correctCountText = document.getElementById('correct-count-text');
+            const rankTitle = document.getElementById('rank-title');
+            const rankMessage = document.getElementById('rank-message');
+
+            const wrongSection = document.getElementById('wrong-section');
+            const wrongListContainer = document.getElementById('wrong-list-container');
+
+            if (isReviewMode) {
+                scoreHeaderBadge.textContent = "ふくしゅう 完了！";
+            } else {
+                scoreHeaderBadge.textContent = "テスト しゅうりょう！";
+            }
+
+            if (gameMode === 'endless' && !isReviewMode) {
+                scoreTitleLabel.textContent = "連続正解（れんぞく）記録";
+                finalScoreNum.textContent = streakCount;
+                scoreUnitLabel.textContent = "問";
+                correctCountText.textContent = `ハイスコア: ${highScore}問`;
+            } else {
+                scoreTitleLabel.textContent = "あなたのてんすう";
+                finalScoreNum.textContent = score;
+                scoreUnitLabel.textContent = "点";
+
+                const totalQ = currentQuestions.length;
+                const correctCount = score / 10;
+                correctCountText.textContent = `${totalQ}問中 ${correctCount}問 せいかい！`;
+            }
+
+            // 間違いがある場合は「ふくしゅうに進む」ボタンのみを表示
+            if (wrongQuestions.length > 0) {
+                wrongSection.classList.remove('hidden');
+                manualReviewBtn.classList.remove('hidden');
+                restartBtn.classList.add('hidden'); // コース選択に戻るボタンを隠す
+
+                wrongListContainer.innerHTML = '';
+
+                wrongQuestions.forEach(q => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white border border-rose-200 rounded-xl p-2.5 flex items-center justify-between text-left shadow-sm';
+                    card.innerHTML = `
+                        <div>
+                            <div class="text-xs font-bold text-rose-500">「${q.sentence}」</div>
+                            <div class="text-sm font-black text-slate-800">正解: <span class="text-rose-600 kanji-font">${q.fullSentence}</span></div>
+                        </div>
+                        <div class="bg-amber-100 border border-amber-300 rounded-lg px-3 py-1 text-lg font-black text-amber-950 kanji-font">
+                            ${q.kanji}
+                        </div>
+                    `;
+                    wrongListContainer.appendChild(card);
+                });
+
+                rankTitle.textContent = "🔥 ふくしゅうしよう！";
+                rankMessage.textContent = "「ふくしゅうに すすむ」ボタンを押して全問正解をめざそう！";
+
+            } else {
+                wrongSection.classList.add('hidden');
+                manualReviewBtn.classList.add('hidden');
+                restartBtn.classList.remove('hidden');
+
+                sound.playFanfare();
+                triggerConfetti();
+                rankTitle.textContent = "💮 パーフェクト！！";
+                rankMessage.textContent = "すごい！全問せいかい！漢字マスターだね！✨";
+            }
+        }
+
+        /* =========================================================
+         * 5. 紙吹雪演出 (Confetti Canvas)
+         * ========================================================= */
+        function triggerConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const particles = [];
+            const colors = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+            for (let i = 0; i < 90; i++) {
+                particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2 - 40,
+                    vx: (Math.random() - 0.5) * 14,
+                    vy: (Math.random() - 0.7) * 14,
+                    size: Math.random() * 8 + 6,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    rotation: Math.random() * 360,
+                    rSpeed: (Math.random() - 0.5) * 10
+                });
+            }
+
+            let animationFrame;
+            let timer = 0;
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                timer++;
+
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.3;
+                    p.rotation += p.rSpeed;
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rotation * Math.PI) / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                    ctx.restore();
+                });
+
+                if (timer < 130) {
+                    animationFrame = requestAnimationFrame(animate);
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+
+            animate();
+        }
+
+        window.addEventListener('resize', () => {
+            const canvas = document.getElementById('confetti-canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>
